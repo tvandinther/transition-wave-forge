@@ -23,7 +23,7 @@ export default function WaveForge() {
   const [normalize, setNormalize] = useState(true);
   const [clampOutput, setClampOutput] = useState(false);
   const [showLayers, setShowLayers] = useState(true);
-  const [scaleXAxis, setScaleXAxis] = useState(false);
+  const [timeWarp, setTimeWarp] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(PRESETS[0].layers.map((l) => ({ ...l, id: nextId() })));
   const [presetIdx, setPresetIdx] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -49,15 +49,29 @@ export default function WaveForge() {
     setLayers((ls) => [...ls, baseLayer({ type: "sine", amplitude: 0.2, cycles: 8, previewCycles: 8 })]);
   };
 
+  // where the raw (un-warped) combined signal first hits 0 and last hits 1 — the window the
+  // time-warp stretches to fill the whole 0-1 progress range
+  const warpRange = useMemo((): { t0: number; t1: number } | null => {
+    if (!timeWarp) return null;
+    const rawSamples: number[] = [];
+    for (let i = 0; i <= N; i++) rawSamples.push(rawAt(layers, i / N));
+    const t0 = firstCrossing(rawSamples, 0);
+    const t1 = lastCrossing(rawSamples, 1);
+    return t1 > t0 ? { t0, t1 } : null;
+  }, [layers, timeWarp]);
+
   const samples = useMemo(() => {
-    const raw0 = rawAt(layers, 0);
-    const raw1 = rawAt(layers, 1);
+    const t0 = warpRange?.t0 ?? 0;
+    const t1 = warpRange?.t1 ?? 1;
+    const mapT = (t: number) => t0 + t * (t1 - t0);
+    const raw0 = rawAt(layers, t0);
+    const raw1 = rawAt(layers, t1);
     const denom = raw1 - raw0;
-    const badDenom = isDegenerate(layers);
+    const badDenom = isDegenerate(layers, t0, t1);
     const pts: number[] = [];
     const perLayer: number[][] = layers.map(() => []);
     for (let i = 0; i <= N; i++) {
-      const t = i / N;
+      const t = mapT(i / N);
       const raw = rawAt(layers, t);
       let combined = normalize && !badDenom ? (raw - raw0) / denom : raw;
       if (clampOutput) combined = Math.min(1, Math.max(0, combined));
@@ -65,18 +79,11 @@ export default function WaveForge() {
       layers.forEach((l, li) => perLayer[li].push(evalLayer(l, t)));
     }
     return { pts, perLayer, badDenom };
-  }, [layers, normalize, clampOutput]);
-
-  const xDomain = useMemo((): [number, number] => {
-    if (!scaleXAxis) return [0, 1];
-    const start = firstCrossing(samples.pts, 0);
-    const end = lastCrossing(samples.pts, 1);
-    return end > start ? [start, end] : [0, 1];
-  }, [samples.pts, scaleXAxis]);
+  }, [layers, normalize, clampOutput, warpRange]);
 
   const expression = useMemo(
-    () => buildFullExpression(layers, progressSource, normalize, clampOutput),
-    [layers, progressSource, normalize, clampOutput]
+    () => buildFullExpression(layers, progressSource, normalize, clampOutput, warpRange),
+    [layers, progressSource, normalize, clampOutput, warpRange]
   );
 
   const copyExpr = async () => {
@@ -155,7 +162,6 @@ export default function WaveForge() {
             perLayer={samples.perLayer}
             badDenom={samples.badDenom}
             showLayers={showLayers}
-            xDomain={xDomain}
             n={N}
           />
         </div>
@@ -184,8 +190,8 @@ export default function WaveForge() {
             Show individual layers
           </label>
           <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={scaleXAxis} onChange={(e) => setScaleXAxis(e.target.checked)} />
-            Zoom x-axis to first 0 → last 1
+            <input type="checkbox" checked={timeWarp} onChange={(e) => setTimeWarp(e.target.checked)} />
+            Scale time so y=0 at t=0, y=1 at t=1
           </label>
         </div>
 

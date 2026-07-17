@@ -91,8 +91,8 @@ export function rawAt(layers: Layer[], t: number): number {
 }
 
 // start value === end value: normalization would divide by zero
-export function isDegenerate(layers: Layer[]): boolean {
-  return Math.abs(rawAt(layers, 1) - rawAt(layers, 0)) < 1e-6;
+export function isDegenerate(layers: Layer[], t0 = 0, t1 = 1): boolean {
+  return Math.abs(rawAt(layers, t1) - rawAt(layers, t0)) < 1e-6;
 }
 
 // earliest t (interpolated) at which the sampled curve reaches `target`; 0 if it never does
@@ -167,20 +167,30 @@ export function buildRawExpr(layers: Layer[], tExpr: string): string {
   return enabled.map((l) => buildLayerTerm(l, tExpr)).join(" + ");
 }
 
+// t0/t1: when set, remaps progressSource through (t0 + progress*(t1-t0)) before evaluating
+// the layers, so the emitted expression itself starts at raw(t0) and ends at raw(t1) instead
+// of raw(0)/raw(1). The values are baked in as numeric literals (from the live-preview crossing
+// search), not solved symbolically in Fusion.
 export function buildFullExpression(
   layers: Layer[],
   progressSource: string,
   normalize: boolean,
-  clampOutput: boolean
+  clampOutput: boolean,
+  timeWarp: { t0: number; t1: number } | null = null
 ): string {
   const src = progressSource.trim() || "Background1.Blend";
-  const rawT = buildRawExpr(layers, src);
+  const tExpr = timeWarp
+    ? `(${numStr(timeWarp.t0)} + (${src})*${numStr(timeWarp.t1 - timeWarp.t0)})`
+    : src;
+  const t0Expr = timeWarp ? numStr(timeWarp.t0) : "0";
+  const t1Expr = timeWarp ? numStr(timeWarp.t1) : "1";
+  const rawT = buildRawExpr(layers, tExpr);
   let expr: string;
-  if (!normalize || isDegenerate(layers)) {
+  if (!normalize || isDegenerate(layers, timeWarp?.t0 ?? 0, timeWarp?.t1 ?? 1)) {
     expr = rawT;
   } else {
-    const raw0 = buildRawExpr(layers, "0");
-    const raw1 = buildRawExpr(layers, "1");
+    const raw0 = buildRawExpr(layers, t0Expr);
+    const raw1 = buildRawExpr(layers, t1Expr);
     expr = `((${rawT}) - (${raw0})) / ((${raw1}) - (${raw0}))`;
   }
   return clampOutput ? clampExpr(expr) : expr;

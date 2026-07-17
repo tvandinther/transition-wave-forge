@@ -82,12 +82,14 @@ export default function HelpModal({ onClose }: HelpModalProps) {
             Overlays each enabled layer's own waveform (before summing) on the scope in its layer color, so you can
             see how each oscillator contributes to the combined green curve.
           </Term>
-          <Term term="Zoom x-axis to first 0 → last 1">
-            Display-only — rescales the scope's t-axis so it starts at the first point the combined curve reaches 0
-            and ends at the last point it reaches 1, stretching that span to fill the plot. Useful for curves that
-            overshoot or settle outside 0–1 near the edges, letting you inspect the meaningful part of the
-            transition. Has no effect on the emitted expression; falls back to the full 0–1 view if the curve never
-            reaches both values.
+          <Term term="Scale time so y=0 at t=0, y=1 at t=1">
+            Finds the first point where the raw combined signal reaches 0 and the last point where it reaches 1, then
+            rewrites the progress input so that window is stretched across the whole 0–1 transition — e.g. progress
+            source Background1.Blend is replaced with (t0 + Background1.Blend*(t1-t0)) everywhere in the expression.
+            This actually crops the transition's timing (unlike Normalize, which only rescales the output), so any
+            flat lead-in or settle-out before/after the 0/1 crossings is skipped. t0/t1 are baked in as fixed
+            numbers read off the live preview, so re-check the scope after changing layer parameters. Falls back to
+            the untouched 0–1 range if the signal never reaches both values.
           </Term>
         </section>
 
