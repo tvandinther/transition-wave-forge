@@ -82,6 +82,13 @@ export default function HelpModal({ onClose }: HelpModalProps) {
             Overlays each enabled layer's own waveform (before summing) on the scope in its layer color, so you can
             see how each oscillator contributes to the combined green curve.
           </Term>
+          <Term term="Zoom x-axis to first 0 → last 1">
+            Display-only — rescales the scope's t-axis so it starts at the first point the combined curve reaches 0
+            and ends at the last point it reaches 1, stretching that span to fill the plot. Useful for curves that
+            overshoot or settle outside 0–1 near the edges, letting you inspect the meaningful part of the
+            transition. Has no effect on the emitted expression; falls back to the full 0–1 view if the curve never
+            reaches both values.
+          </Term>
         </section>
 
         <section className="mb-4">
