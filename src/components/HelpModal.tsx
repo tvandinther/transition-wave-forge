@@ -82,7 +82,7 @@ export default function HelpModal({ onClose }: HelpModalProps) {
             Overlays each enabled layer's own waveform (before summing) on the scope in its layer color, so you can
             see how each oscillator contributes to the combined green curve.
           </Term>
-          <Term term="Scale time so y=0 at t=0, y=1 at t=1">
+          <Term term="Auto-scale timing">
             Finds the first point where the raw combined signal reaches 0 and the last point where it reaches 1, then
             rewrites the progress input so that window is stretched across the whole 0–1 transition — e.g. progress
             source Background1.Blend is replaced with (t0 + Background1.Blend*(t1-t0)) everywhere in the expression.

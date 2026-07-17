@@ -23,7 +23,7 @@ export default function WaveForge() {
   const [normalize, setNormalize] = useState(true);
   const [clampOutput, setClampOutput] = useState(false);
   const [showLayers, setShowLayers] = useState(true);
-  const [timeWarp, setTimeWarp] = useState(false);
+  const [autoScaleTiming, setAutoScaleTiming] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(PRESETS[0].layers.map((l) => ({ ...l, id: nextId() })));
   const [presetIdx, setPresetIdx] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -49,16 +49,16 @@ export default function WaveForge() {
     setLayers((ls) => [...ls, baseLayer({ type: "sine", amplitude: 0.2, cycles: 8, previewCycles: 8 })]);
   };
 
-  // where the raw (un-warped) combined signal first hits 0 and last hits 1 — the window the
-  // time-warp stretches to fill the whole 0-1 progress range
+  // where the raw (un-scaled) combined signal first hits 0 and last hits 1 — the window
+  // auto-scale timing stretches to fill the whole 0-1 progress range
   const warpRange = useMemo((): { t0: number; t1: number } | null => {
-    if (!timeWarp) return null;
+    if (!autoScaleTiming) return null;
     const rawSamples: number[] = [];
     for (let i = 0; i <= N; i++) rawSamples.push(rawAt(layers, i / N));
     const t0 = firstCrossing(rawSamples, 0);
     const t1 = lastCrossing(rawSamples, 1);
     return t1 > t0 ? { t0, t1 } : null;
-  }, [layers, timeWarp]);
+  }, [layers, autoScaleTiming]);
 
   const samples = useMemo(() => {
     const t0 = warpRange?.t0 ?? 0;
@@ -190,8 +190,12 @@ export default function WaveForge() {
             Show individual layers
           </label>
           <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={timeWarp} onChange={(e) => setTimeWarp(e.target.checked)} />
-            Scale time so y=0 at t=0, y=1 at t=1
+            <input
+              type="checkbox"
+              checked={autoScaleTiming}
+              onChange={(e) => setAutoScaleTiming(e.target.checked)}
+            />
+            Auto-scale timing
           </label>
         </div>
 
