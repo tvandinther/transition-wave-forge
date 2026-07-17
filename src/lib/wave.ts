@@ -1,0 +1,131 @@
+export type WaveType = "ramp" | "saw" | "square" | "pwm" | "sine";
+export type CyclesMode = "fixed" | "linked";
+
+export interface Layer {
+  id: number;
+  type: WaveType;
+  enabled: boolean;
+  amplitude: number;
+  cyclesMode: CyclesMode;
+  cycles: number;
+  previewCycles: number;
+  linkPath: string;
+  phase: number;
+  duty: number;
+  quantize: number;
+}
+
+export const TYPE_LABEL: Record<WaveType, string> = {
+  ramp: "Ramp",
+  saw: "Saw",
+  square: "Square",
+  pwm: "PWM",
+  sine: "Sine",
+};
+
+export const LAYER_COLORS = [
+  "#4CFF9E",
+  "#FFB454",
+  "#5EC8FF",
+  "#FF7A9C",
+  "#C8A6FF",
+  "#8FE3C0",
+];
+
+let uid = 1;
+export const nextId = () => uid++;
+
+export const baseLayer = (overrides: Partial<Layer> = {}): Layer => ({
+  id: nextId(),
+  type: "square",
+  enabled: true,
+  amplitude: 1,
+  cyclesMode: "fixed",
+  cycles: 4,
+  previewCycles: 4,
+  linkPath: "Custom1.CycleCount",
+  phase: 0,
+  duty: 0.5,
+  quantize: 0,
+  ...overrides,
+});
+
+export interface Preset {
+  name: string;
+  note: string;
+  progressSource: string;
+  normalize: boolean;
+  layers: Layer[];
+}
+
+// ---------- math (used for the live preview) ----------
+
+export function evalLayer(layer: Layer, t: number): number {
+  if (!layer.enabled) return 0;
+  let val: number;
+  if (layer.type === "ramp") {
+    val = t;
+  } else {
+    const cyc = layer.cyclesMode === "fixed" ? Number(layer.cycles) || 0 : Number(layer.previewCycles) || 0;
+    const X = cyc * t + (Number(layer.phase) || 0);
+    const frac = X - Math.floor(X);
+    if (layer.type === "saw") val = frac;
+    else if (layer.type === "square") val = frac < 0.5 ? 1 : 0;
+    else if (layer.type === "pwm") val = frac < (Number(layer.duty) || 0.5) ? 1 : 0;
+    else if (layer.type === "sine") val = 0.5 + 0.5 * Math.sin(2 * Math.PI * X);
+    else val = 0;
+  }
+  if (layer.quantize && Number(layer.quantize) > 0) {
+    const s = Number(layer.quantize);
+    val = Math.floor(val * s + 0.5) / s;
+  }
+  return val * (Number(layer.amplitude) || 0);
+}
+
+export function rawAt(layers: Layer[], t: number): number {
+  return layers.reduce((sum, l) => sum + evalLayer(l, t), 0);
+}
+
+// ---------- expression string building (emitted as the Fusion expression) ----------
+
+function numStr(n: number): string {
+  const v = Math.round(Number(n) * 10000) / 10000;
+  return String(v);
+}
+
+function buildLayerTerm(layer: Layer, tExpr: string): string {
+  const amp = numStr(layer.amplitude);
+  let val: string;
+  if (layer.type === "ramp") {
+    val = `(${tExpr})`;
+  } else {
+    const cyc = layer.cyclesMode === "fixed" ? numStr(layer.cycles) : layer.linkPath || "1";
+    const phase = Number(layer.phase) || 0;
+    const X = phase !== 0 ? `((${cyc})*(${tExpr}) + ${numStr(phase)})` : `((${cyc})*(${tExpr}))`;
+    const FRAC = `(${X} - floor(${X}))`;
+    if (layer.type === "saw") val = FRAC;
+    else if (layer.type === "square") val = `(${FRAC} < 0.5 ? 1 : 0)`;
+    else if (layer.type === "pwm") val = `(${FRAC} < ${numStr(layer.duty)} ? 1 : 0)`;
+    else val = `(0.5 + 0.5*sin(2*pi*${X}))`;
+  }
+  if (layer.quantize && Number(layer.quantize) > 0) {
+    const s = numStr(layer.quantize);
+    val = `(floor((${val})*${s} + 0.5)/${s})`;
+  }
+  return `(${amp}*${val})`;
+}
+
+export function buildRawExpr(layers: Layer[], tExpr: string): string {
+  const enabled = layers.filter((l) => l.enabled);
+  if (enabled.length === 0) return "0";
+  return enabled.map((l) => buildLayerTerm(l, tExpr)).join(" + ");
+}
+
+export function buildFullExpression(layers: Layer[], progressSource: string, normalize: boolean): string {
+  const src = progressSource.trim() || "Background1.Blend";
+  const rawT = buildRawExpr(layers, src);
+  if (!normalize) return rawT;
+  const raw0 = buildRawExpr(layers, "0");
+  const raw1 = buildRawExpr(layers, "1");
+  return `((${rawT}) - (${raw0})) / ((${raw1}) - (${raw0}))`;
+}
