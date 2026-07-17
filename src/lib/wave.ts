@@ -13,6 +13,7 @@ export interface Layer {
   phase: number;
   duty: number;
   quantize: number;
+  clamp: boolean;
 }
 
 export const TYPE_LABEL: Record<WaveType, string> = {
@@ -47,6 +48,7 @@ export const baseLayer = (overrides: Partial<Layer> = {}): Layer => ({
   phase: 0,
   duty: 0.5,
   quantize: 0,
+  clamp: false,
   ...overrides,
 });
 
@@ -55,6 +57,7 @@ export interface Preset {
   note: string;
   progressSource: string;
   normalize: boolean;
+  clampOutput?: boolean;
   layers: Layer[];
 }
 
@@ -79,7 +82,8 @@ export function evalLayer(layer: Layer, t: number): number {
     const s = Number(layer.quantize);
     val = Math.floor(val * s + 0.5) / s;
   }
-  return val * (Number(layer.amplitude) || 0);
+  const out = val * (Number(layer.amplitude) || 0);
+  return layer.clamp ? Math.min(1, Math.max(0, out)) : out;
 }
 
 export function rawAt(layers: Layer[], t: number): number {
@@ -96,6 +100,10 @@ export function isDegenerate(layers: Layer[]): boolean {
 function numStr(n: number): string {
   const v = Math.round(Number(n) * 10000) / 10000;
   return String(v);
+}
+
+function clampExpr(expr: string): string {
+  return `(${expr} < 0 ? 0 : (${expr} > 1 ? 1 : ${expr}))`;
 }
 
 function buildLayerTerm(layer: Layer, tExpr: string): string {
@@ -117,7 +125,8 @@ function buildLayerTerm(layer: Layer, tExpr: string): string {
     const s = numStr(layer.quantize);
     val = `(floor((${val})*${s} + 0.5)/${s})`;
   }
-  return `(${amp}*${val})`;
+  const term = `(${amp}*${val})`;
+  return layer.clamp ? clampExpr(term) : term;
 }
 
 export function buildRawExpr(layers: Layer[], tExpr: string): string {
@@ -126,11 +135,21 @@ export function buildRawExpr(layers: Layer[], tExpr: string): string {
   return enabled.map((l) => buildLayerTerm(l, tExpr)).join(" + ");
 }
 
-export function buildFullExpression(layers: Layer[], progressSource: string, normalize: boolean): string {
+export function buildFullExpression(
+  layers: Layer[],
+  progressSource: string,
+  normalize: boolean,
+  clampOutput: boolean
+): string {
   const src = progressSource.trim() || "Background1.Blend";
   const rawT = buildRawExpr(layers, src);
-  if (!normalize || isDegenerate(layers)) return rawT;
-  const raw0 = buildRawExpr(layers, "0");
-  const raw1 = buildRawExpr(layers, "1");
-  return `((${rawT}) - (${raw0})) / ((${raw1}) - (${raw0}))`;
+  let expr: string;
+  if (!normalize || isDegenerate(layers)) {
+    expr = rawT;
+  } else {
+    const raw0 = buildRawExpr(layers, "0");
+    const raw1 = buildRawExpr(layers, "1");
+    expr = `((${rawT}) - (${raw0})) / ((${raw1}) - (${raw0}))`;
+  }
+  return clampOutput ? clampExpr(expr) : expr;
 }
