@@ -95,6 +95,38 @@ export function isDegenerate(layers: Layer[]): boolean {
   return Math.abs(rawAt(layers, 1) - rawAt(layers, 0)) < 1e-6;
 }
 
+// earliest t (interpolated) at which the sampled curve reaches `target`; 0 if it never does
+export function firstCrossing(pts: number[], target: number): number {
+  const n = pts.length - 1;
+  for (let i = 0; i <= n; i++) {
+    const v = pts[i];
+    if (v === target) return i / n;
+    if (i < n) {
+      const next = pts[i + 1];
+      if ((v < target) !== (next < target)) {
+        return (i + (target - v) / (next - v)) / n;
+      }
+    }
+  }
+  return 0;
+}
+
+// latest t (interpolated) at which the sampled curve reaches `target`; 1 if it never does
+export function lastCrossing(pts: number[], target: number): number {
+  const n = pts.length - 1;
+  for (let i = n; i >= 0; i--) {
+    const v = pts[i];
+    if (v === target) return i / n;
+    if (i > 0) {
+      const prev = pts[i - 1];
+      if ((prev < target) !== (v < target)) {
+        return (i - 1 + (target - prev) / (v - prev)) / n;
+      }
+    }
+  }
+  return 1;
+}
+
 // ---------- expression string building (emitted as the Fusion expression) ----------
 
 function numStr(n: number): string {

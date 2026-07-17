@@ -1,7 +1,17 @@
 import { useMemo, useRef, useState } from "react";
 import { Plus, Copy, Check, Zap, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { PRESETS } from "../data/presets";
-import { baseLayer, buildFullExpression, evalLayer, isDegenerate, nextId, rawAt, type Layer } from "../lib/wave";
+import {
+  baseLayer,
+  buildFullExpression,
+  evalLayer,
+  firstCrossing,
+  isDegenerate,
+  lastCrossing,
+  nextId,
+  rawAt,
+  type Layer,
+} from "../lib/wave";
 import LayerRow from "./LayerRow";
 import Scope from "./Scope";
 import HelpModal from "./HelpModal";
@@ -13,6 +23,7 @@ export default function WaveForge() {
   const [normalize, setNormalize] = useState(true);
   const [clampOutput, setClampOutput] = useState(false);
   const [showLayers, setShowLayers] = useState(true);
+  const [scaleXAxis, setScaleXAxis] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(PRESETS[0].layers.map((l) => ({ ...l, id: nextId() })));
   const [presetIdx, setPresetIdx] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -55,6 +66,13 @@ export default function WaveForge() {
     }
     return { pts, perLayer, badDenom };
   }, [layers, normalize, clampOutput]);
+
+  const xDomain = useMemo((): [number, number] => {
+    if (!scaleXAxis) return [0, 1];
+    const start = firstCrossing(samples.pts, 0);
+    const end = lastCrossing(samples.pts, 1);
+    return end > start ? [start, end] : [0, 1];
+  }, [samples.pts, scaleXAxis]);
 
   const expression = useMemo(
     () => buildFullExpression(layers, progressSource, normalize, clampOutput),
@@ -137,6 +155,7 @@ export default function WaveForge() {
             perLayer={samples.perLayer}
             badDenom={samples.badDenom}
             showLayers={showLayers}
+            xDomain={xDomain}
             n={N}
           />
         </div>
@@ -163,6 +182,10 @@ export default function WaveForge() {
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" checked={showLayers} onChange={(e) => setShowLayers(e.target.checked)} />
             Show individual layers
+          </label>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={scaleXAxis} onChange={(e) => setScaleXAxis(e.target.checked)} />
+            Zoom x-axis to first 0 → last 1
           </label>
         </div>
 
