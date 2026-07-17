@@ -1,7 +1,17 @@
 import { useMemo, useRef, useState } from "react";
 import { Plus, Copy, Check, Zap, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { PRESETS } from "../data/presets";
-import { baseLayer, buildFullExpression, evalLayer, isDegenerate, nextId, rawAt, type Layer } from "../lib/wave";
+import {
+  baseLayer,
+  buildFullExpression,
+  evalLayer,
+  firstCrossing,
+  isDegenerate,
+  lastCrossing,
+  nextId,
+  rawAt,
+  type Layer,
+} from "../lib/wave";
 import LayerRow from "./LayerRow";
 import Scope from "./Scope";
 import HelpModal from "./HelpModal";
@@ -13,6 +23,7 @@ export default function WaveForge() {
   const [normalize, setNormalize] = useState(true);
   const [clampOutput, setClampOutput] = useState(false);
   const [showLayers, setShowLayers] = useState(true);
+  const [autoScaleTiming, setAutoScaleTiming] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(PRESETS[0].layers.map((l) => ({ ...l, id: nextId() })));
   const [presetIdx, setPresetIdx] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -38,15 +49,29 @@ export default function WaveForge() {
     setLayers((ls) => [...ls, baseLayer({ type: "sine", amplitude: 0.2, cycles: 8, previewCycles: 8 })]);
   };
 
+  // where the raw (un-scaled) combined signal first hits 0 and last hits 1 — the window
+  // auto-scale timing stretches to fill the whole 0-1 progress range
+  const warpRange = useMemo((): { t0: number; t1: number } | null => {
+    if (!autoScaleTiming) return null;
+    const rawSamples: number[] = [];
+    for (let i = 0; i <= N; i++) rawSamples.push(rawAt(layers, i / N));
+    const t0 = firstCrossing(rawSamples, 0);
+    const t1 = lastCrossing(rawSamples, 1);
+    return t1 > t0 ? { t0, t1 } : null;
+  }, [layers, autoScaleTiming]);
+
   const samples = useMemo(() => {
-    const raw0 = rawAt(layers, 0);
-    const raw1 = rawAt(layers, 1);
+    const t0 = warpRange?.t0 ?? 0;
+    const t1 = warpRange?.t1 ?? 1;
+    const mapT = (t: number) => t0 + t * (t1 - t0);
+    const raw0 = rawAt(layers, t0);
+    const raw1 = rawAt(layers, t1);
     const denom = raw1 - raw0;
-    const badDenom = isDegenerate(layers);
+    const badDenom = isDegenerate(layers, t0, t1);
     const pts: number[] = [];
     const perLayer: number[][] = layers.map(() => []);
     for (let i = 0; i <= N; i++) {
-      const t = i / N;
+      const t = mapT(i / N);
       const raw = rawAt(layers, t);
       let combined = normalize && !badDenom ? (raw - raw0) / denom : raw;
       if (clampOutput) combined = Math.min(1, Math.max(0, combined));
@@ -54,11 +79,11 @@ export default function WaveForge() {
       layers.forEach((l, li) => perLayer[li].push(evalLayer(l, t)));
     }
     return { pts, perLayer, badDenom };
-  }, [layers, normalize, clampOutput]);
+  }, [layers, normalize, clampOutput, warpRange]);
 
   const expression = useMemo(
-    () => buildFullExpression(layers, progressSource, normalize, clampOutput),
-    [layers, progressSource, normalize, clampOutput]
+    () => buildFullExpression(layers, progressSource, normalize, clampOutput, warpRange),
+    [layers, progressSource, normalize, clampOutput, warpRange]
   );
 
   const copyExpr = async () => {
@@ -163,6 +188,14 @@ export default function WaveForge() {
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" checked={showLayers} onChange={(e) => setShowLayers(e.target.checked)} />
             Show individual layers
+          </label>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={autoScaleTiming}
+              onChange={(e) => setAutoScaleTiming(e.target.checked)}
+            />
+            Auto-scale timing
           </label>
         </div>
 
