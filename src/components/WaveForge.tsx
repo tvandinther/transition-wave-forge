@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { Plus, Copy, Check, Zap } from "lucide-react";
+import { Plus, Copy, Check, Zap, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { PRESETS } from "../data/presets";
 import { baseLayer, buildFullExpression, evalLayer, isDegenerate, nextId, rawAt, type Layer } from "../lib/wave";
 import LayerRow from "./LayerRow";
 import Scope from "./Scope";
+import HelpModal from "./HelpModal";
 
 const N = 240;
 
@@ -15,6 +16,8 @@ export default function WaveForge() {
   const [layers, setLayers] = useState<Layer[]>(PRESETS[0].layers.map((l) => ({ ...l, id: nextId() })));
   const [presetIdx, setPresetIdx] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [helpOpen, setHelpOpen] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   const applyPreset = (idx: number) => {
@@ -75,7 +78,13 @@ export default function WaveForge() {
 
   return (
     <div
-      style={{ background: "#0A0D0A", minHeight: "100%", color: "#DCEFE0", fontFamily: "ui-sans-serif, system-ui, sans-serif" }}
+      style={{
+        background: "#0A0D0A",
+        minHeight: "100%",
+        color: "#DCEFE0",
+        fontFamily: "ui-sans-serif, system-ui, sans-serif",
+        paddingBottom: drawerOpen ? 260 : 56,
+      }}
       className="p-4 sm:p-6"
     >
       <style>{`
@@ -96,6 +105,13 @@ export default function WaveForge() {
           <h1 className="text-lg font-semibold tracking-wide" style={{ color: "#EAF7EC" }}>
             Wave Expression Forge
           </h1>
+          <button
+            className="wf-btn flex items-center gap-1 ml-auto"
+            onClick={() => setHelpOpen(true)}
+            aria-label="help"
+          >
+            <HelpCircle size={14} /> help
+          </button>
         </div>
         <p className="wf-label mb-4">stacked oscillators → single-line fusion expression, always 0 at start, 1 at end</p>
 
@@ -114,14 +130,16 @@ export default function WaveForge() {
           </span>
         </div>
 
-        <Scope
-          layers={layers}
-          pts={samples.pts}
-          perLayer={samples.perLayer}
-          badDenom={samples.badDenom}
-          showLayers={showLayers}
-          n={N}
-        />
+        <div style={{ position: "sticky", top: 0, zIndex: 20, background: "#0A0D0A", paddingTop: 4, marginTop: -4 }}>
+          <Scope
+            layers={layers}
+            pts={samples.pts}
+            perLayer={samples.perLayer}
+            badDenom={samples.badDenom}
+            showLayers={showLayers}
+            n={N}
+          />
+        </div>
 
         {/* global controls */}
         <div className="wf-panel p-3 mb-4 flex flex-wrap items-center gap-4">
@@ -170,29 +188,64 @@ export default function WaveForge() {
           </button>
         </div>
 
-        {/* expression output */}
-        <div className="wf-panel p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="wf-label">Fusion expression — paste into the expression field</span>
+      </div>
+
+      {/* expression output drawer */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 30,
+          background: "#12160F",
+          borderTop: "1px solid #24301F",
+          boxShadow: "0 -6px 20px rgba(0,0,0,0.45)",
+        }}
+      >
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between gap-2 py-2">
+            <button
+              onClick={() => setDrawerOpen((o) => !o)}
+              className="wf-label"
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: 0,
+              }}
+            >
+              {drawerOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              Fusion expression — paste into the expression field
+            </button>
             <button className="wf-btn flex items-center gap-1.5" onClick={copyExpr}>
               {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "copied" : "copy"}
             </button>
           </div>
-          <textarea
-            ref={textRef}
-            readOnly
-            className="wf-input wf-mono"
-            style={{ width: "100%", height: 90, resize: "vertical", lineHeight: 1.5 }}
-            value={expression}
-          />
-          <p className="text-xs mt-2" style={{ color: "#5C6E58" }}>
-            Uses floor(), sin(), pi and the ternary operator (cond ? a : b), all supported in Fusion's expression
-            fields. "Progress source" should be the control driving 0→1 across your transition (e.g.
-            Background1.Blend). For a linked cycle count, point it at any discrete Fusion control's value (e.g.
-            Custom1.CycleCount).
-          </p>
+          {drawerOpen && (
+            <div className="pb-3">
+              <textarea
+                ref={textRef}
+                readOnly
+                className="wf-input wf-mono"
+                style={{ width: "100%", height: 90, resize: "vertical", lineHeight: 1.5 }}
+                value={expression}
+              />
+              <p className="text-xs mt-2" style={{ color: "#5C6E58" }}>
+                Uses floor(), sin(), pi and the ternary operator (cond ? a : b), all supported in Fusion's expression
+                fields. "Progress source" should be the control driving 0→1 across your transition (e.g.
+                Background1.Blend). For a linked cycle count, point it at any discrete Fusion control's value (e.g.
+                Custom1.CycleCount).
+              </p>
+            </div>
+          )}
         </div>
       </div>
+
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }
