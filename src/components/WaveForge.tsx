@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Plus, Copy, Check, Zap } from "lucide-react";
 import { PRESETS } from "../data/presets";
-import { baseLayer, buildFullExpression, evalLayer, nextId, rawAt, type Layer } from "../lib/wave";
+import { baseLayer, buildFullExpression, evalLayer, isDegenerate, nextId, rawAt, type Layer } from "../lib/wave";
 import LayerRow from "./LayerRow";
 import Scope from "./Scope";
 
@@ -37,7 +37,7 @@ export default function WaveForge() {
     const raw0 = rawAt(layers, 0);
     const raw1 = rawAt(layers, 1);
     const denom = raw1 - raw0;
-    const badDenom = Math.abs(denom) < 1e-6;
+    const badDenom = isDegenerate(layers);
     const pts: number[] = [];
     const perLayer: number[][] = layers.map(() => []);
     for (let i = 0; i <= N; i++) {

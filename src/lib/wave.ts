@@ -86,6 +86,11 @@ export function rawAt(layers: Layer[], t: number): number {
   return layers.reduce((sum, l) => sum + evalLayer(l, t), 0);
 }
 
+// start value === end value: normalization would divide by zero
+export function isDegenerate(layers: Layer[]): boolean {
+  return Math.abs(rawAt(layers, 1) - rawAt(layers, 0)) < 1e-6;
+}
+
 // ---------- expression string building (emitted as the Fusion expression) ----------
 
 function numStr(n: number): string {
@@ -124,7 +129,7 @@ export function buildRawExpr(layers: Layer[], tExpr: string): string {
 export function buildFullExpression(layers: Layer[], progressSource: string, normalize: boolean): string {
   const src = progressSource.trim() || "Background1.Blend";
   const rawT = buildRawExpr(layers, src);
-  if (!normalize) return rawT;
+  if (!normalize || isDegenerate(layers)) return rawT;
   const raw0 = buildRawExpr(layers, "0");
   const raw1 = buildRawExpr(layers, "1");
   return `((${rawT}) - (${raw0})) / ((${raw1}) - (${raw0}))`;
