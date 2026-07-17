@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Plus, Copy, Check, Zap } from "lucide-react";
 import { PRESETS } from "../data/presets";
-import { baseLayer, buildFullExpression, evalLayer, nextId, rawAt, type Layer } from "../lib/wave";
+import { baseLayer, buildFullExpression, evalLayer, isDegenerate, nextId, rawAt, type Layer } from "../lib/wave";
 import LayerRow from "./LayerRow";
 import Scope from "./Scope";
 
@@ -10,6 +10,7 @@ const N = 240;
 export default function WaveForge() {
   const [progressSource, setProgressSource] = useState("Background1.Blend");
   const [normalize, setNormalize] = useState(true);
+  const [clampOutput, setClampOutput] = useState(false);
   const [showLayers, setShowLayers] = useState(true);
   const [layers, setLayers] = useState<Layer[]>(PRESETS[0].layers.map((l) => ({ ...l, id: nextId() })));
   const [presetIdx, setPresetIdx] = useState(0);
@@ -21,6 +22,7 @@ export default function WaveForge() {
     setPresetIdx(idx);
     setProgressSource(p.progressSource);
     setNormalize(p.normalize);
+    setClampOutput(p.clampOutput ?? false);
     setLayers(p.layers.map((l) => ({ ...l, id: nextId() })));
   };
 
@@ -37,22 +39,23 @@ export default function WaveForge() {
     const raw0 = rawAt(layers, 0);
     const raw1 = rawAt(layers, 1);
     const denom = raw1 - raw0;
-    const badDenom = Math.abs(denom) < 1e-6;
+    const badDenom = isDegenerate(layers);
     const pts: number[] = [];
     const perLayer: number[][] = layers.map(() => []);
     for (let i = 0; i <= N; i++) {
       const t = i / N;
       const raw = rawAt(layers, t);
-      const combined = normalize && !badDenom ? (raw - raw0) / denom : raw;
+      let combined = normalize && !badDenom ? (raw - raw0) / denom : raw;
+      if (clampOutput) combined = Math.min(1, Math.max(0, combined));
       pts.push(combined);
       layers.forEach((l, li) => perLayer[li].push(evalLayer(l, t)));
     }
     return { pts, perLayer, badDenom };
-  }, [layers, normalize]);
+  }, [layers, normalize, clampOutput]);
 
   const expression = useMemo(
-    () => buildFullExpression(layers, progressSource, normalize),
-    [layers, progressSource, normalize]
+    () => buildFullExpression(layers, progressSource, normalize, clampOutput),
+    [layers, progressSource, normalize, clampOutput]
   );
 
   const copyExpr = async () => {
@@ -134,6 +137,10 @@ export default function WaveForge() {
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" checked={normalize} onChange={(e) => setNormalize(e.target.checked)} />
             Normalize (force start=0, end=1)
+          </label>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={clampOutput} onChange={(e) => setClampOutput(e.target.checked)} />
+            Clamp output to 0–1
           </label>
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" checked={showLayers} onChange={(e) => setShowLayers(e.target.checked)} />

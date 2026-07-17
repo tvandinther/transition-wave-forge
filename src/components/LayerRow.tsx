@@ -112,6 +112,11 @@ export default function LayerRow({ layer: l, index: li, onChange, onRemove }: La
           </div>
         )}
 
+        <label className="flex items-center gap-1 text-xs">
+          <input type="checkbox" checked={l.clamp} onChange={(e) => onChange({ clamp: e.target.checked })} /> clamp
+          0–1
+        </label>
+
         <div className="flex items-center gap-1">
           <span className="wf-label">quantize</span>
           <input
