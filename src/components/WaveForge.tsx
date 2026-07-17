@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { Plus, Copy, Check, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Copy, Check, Zap, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 import { PRESETS } from "../data/presets";
 import { baseLayer, buildFullExpression, evalLayer, isDegenerate, nextId, rawAt, type Layer } from "../lib/wave";
 import LayerRow from "./LayerRow";
 import Scope from "./Scope";
+import HelpModal from "./HelpModal";
 
 const N = 240;
 
@@ -16,6 +17,7 @@ export default function WaveForge() {
   const [presetIdx, setPresetIdx] = useState(0);
   const [copied, setCopied] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [helpOpen, setHelpOpen] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
   const applyPreset = (idx: number) => {
@@ -103,6 +105,13 @@ export default function WaveForge() {
           <h1 className="text-lg font-semibold tracking-wide" style={{ color: "#EAF7EC" }}>
             Wave Expression Forge
           </h1>
+          <button
+            className="wf-btn flex items-center gap-1 ml-auto"
+            onClick={() => setHelpOpen(true)}
+            aria-label="help"
+          >
+            <HelpCircle size={14} /> help
+          </button>
         </div>
         <p className="wf-label mb-4">stacked oscillators → single-line fusion expression, always 0 at start, 1 at end</p>
 
@@ -235,6 +244,8 @@ export default function WaveForge() {
           )}
         </div>
       </div>
+
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }
