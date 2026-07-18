@@ -268,10 +268,10 @@ export default function WaveForge() {
                 value={expression}
               />
               <p className="text-xs mt-2" style={{ color: "#5C6E58" }}>
-                Uses floor(), sin(), pi and the ternary operator (cond ? a : b), all supported in Fusion's expression
-                fields. "Progress source" should be the control driving 0→1 across your transition (e.g.
-                Background1.Blend). For a linked cycle count, point it at any discrete Fusion control's value (e.g.
-                Custom1.CycleCount).
+                Uses floor(), sin(), pi and iif(cond, a, b) — Fusion expressions don't support the ternary operator
+                (cond ? a : b), so iif() is used instead. "Progress source" should be the control driving 0→1 across
+                your transition (e.g. Background1.Blend). For a linked cycle count, point it at any discrete Fusion
+                control's value (e.g. Custom1.CycleCount).
               </p>
             </div>
           )}

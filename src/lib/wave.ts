@@ -135,7 +135,7 @@ function numStr(n: number): string {
 }
 
 function clampExpr(expr: string): string {
-  return `(${expr} < 0 ? 0 : (${expr} > 1 ? 1 : ${expr}))`;
+  return `iif(${expr} < 0, 0, iif(${expr} > 1, 1, ${expr}))`;
 }
 
 function buildLayerTerm(layer: Layer, tExpr: string): string {
@@ -149,8 +149,8 @@ function buildLayerTerm(layer: Layer, tExpr: string): string {
     const X = phase !== 0 ? `((${cyc})*(${tExpr}) + ${numStr(phase)})` : `((${cyc})*(${tExpr}))`;
     const FRAC = `(${X} - floor(${X}))`;
     if (layer.type === "saw") val = FRAC;
-    else if (layer.type === "square") val = `(${FRAC} < 0.5 ? 1 : 0)`;
-    else if (layer.type === "pwm") val = `(${FRAC} < ${numStr(layer.duty)} ? 1 : 0)`;
+    else if (layer.type === "square") val = `iif(${FRAC} < 0.5, 1, 0)`;
+    else if (layer.type === "pwm") val = `iif(${FRAC} < ${numStr(layer.duty)}, 1, 0)`;
     else val = `(0.5 + 0.5*sin(2*pi*${X}))`;
   }
   if (layer.quantize && Number(layer.quantize) > 0) {

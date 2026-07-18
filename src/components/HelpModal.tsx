@@ -134,8 +134,9 @@ export default function HelpModal({ onClose }: HelpModalProps) {
           <h3 className="wf-label mb-2">Fusion expression</h3>
           <p className="text-xs" style={{ color: "#B9CBB8" }}>
             The drawer at the bottom of the page renders the combined layer stack as a single-line expression using
-            floor(), sin(), pi and the ternary operator (cond ? a : b) — all supported in Fusion's expression fields.
-            Paste it directly into the expression field of the control you want to drive.
+            floor(), sin(), pi and iif(cond, a, b) — all supported in Fusion's expression fields. Fusion expressions
+            don't support the ternary operator (cond ? a : b), so iif() is used instead. Paste it directly into the
+            expression field of the control you want to drive.
           </p>
         </section>
       </div>
