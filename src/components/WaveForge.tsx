@@ -105,7 +105,7 @@ export default function WaveForge() {
     <div
       style={{
         background: "#0A0D0A",
-        minHeight: "100%",
+        minHeight: "100dvh",
         color: "#DCEFE0",
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
         paddingBottom: drawerOpen ? 260 : 56,
